@@ -1,0 +1,23 @@
+title: Check state of 1-wire sensors output
+agents: linux
+catalog: os/hardware
+author: Christian Kreidl
+license: GPLv2
+distribution: http://
+description:
+ Checks the output of '{sensors}' connected to a host by 1-wire bus. It requires the owfs library and uses a TCP-connection to the owserver running on localhost:4304 to retrieve data using an check_mk-agent plugin.
+
+examples:
+ set names for the 1-wire sensors:
+  set "alias = /etc/owfs-alias.txt" in /etc/owfs.conf
+  List the sensor adresses and names in /etc/owfs-alias.txt:
+   /28.9669D6070000 AC-unit-intake
+   /26.6F6CE1010000 Rack1-Top
+
+inventory:
+ Each host which provides the section in the check_mk agent gets one Sensor_XXX service per reported sensor.
+
+perfdata: 
+ One variable: the current sensor value.
+ Four variables on the humidity sensors: rel. and abs. humidity, temperature and calculated dewpoint.
+

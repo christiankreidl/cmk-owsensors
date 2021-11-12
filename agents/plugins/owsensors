@@ -1,0 +1,106 @@
+#!/usr/bin/perl -w
+#
+# Check_mk 1-wire check
+# (c) 2021 Christian Kreidl
+# Version 1.0
+#
+# Check humidity of 1Wire device
+# Requires use of Fuse and owfs
+#
+# based on nagios check:
+# By Peter Andersson
+# peter@it-slav.net
+# http://www.it-slav.net/blogs/?p=802
+# Licence GPLv2
+# Version 1.0
+
+use strict;
+use OW;
+use Getopt::Long;
+#use Data::Dumper qw(Dumper);
+
+
+my $owserver = "localhost:4304";
+
+GetOptions ("server=s" => \$owserver)    # string 
+or die("Error in command line arguments! Usage: $0 [-s|--server hostname:port]\n");
+
+print "<<<owsensors>>>\n";
+
+# connect to owserver
+unless(OW::init($owserver)) {
+	print "OWServer not running at $owserver\n";
+	exit 1;
+}
+
+my @allentries = split(/,/,OW::get(""));
+#print Dumper \@allentries;
+
+# cycle through all OW root directory entries. also non sensor entries exist!
+# addresses are replaced by entries in alias-file!
+foreach my $device (@allentries) {
+   if ($device =~ /\/$/) { chop($device); } # remove trailing "/"
+
+   ###########################################################
+   # try to get sensor family number.
+   my $family = OW::get("$device/family");
+   next unless defined $family; # skip entry if not a sensor
+
+
+   ###########################################################
+   # filter DS18B20 temperature sensors
+   if ($family == 28) {
+
+      my $temperature = OW::get("$device/temperature");
+
+      printf("$device $family %.1f °C\n", $temperature);
+   }
+
+   ###########################################################
+   # filter DS2438 battery monitors aka humidity sensors
+   if ($family == 26) {
+
+      my $temperature = OW::get("$device/temperature");
+      my $humidity_rel = OW::get("$device/HIH4000/humidity");
+
+      # calculate relative humidity based on sensor voltage
+      #my $vdd = OW::get("$device/VDD");
+      #my $vad = OW::get("$device/VAD");
+      #my $humidity_rel_calc = (($vad/$vdd)-0.16)/0.0062;
+
+      # https://carnotcycle.wordpress.com/2012/08/04/how-to-convert-relative-humidity-to-absolute-humidity/
+      #my $humidity_abs = (6.112 * exp((17.67 * $temperature) / ($temperature + 243.5)) * $humidity_rel * 18.02) / ((273.15 + $temperature) * 100 * 0.08314);
+
+      #
+      # formulas: https://www.aqua-calc.com/calculate/humidity
+      #
+
+      # calc absolute humidity
+      my $temperatureK = 273.15 + $temperature;
+      my $phi = 1 - $temperatureK/647.096;
+      my $Pw  = $humidity_rel/100.0 *
+                  exp( 647.096/$temperatureK * (
+                     -7.85951783*$phi +
+                      1.84408259*$phi**1.5 +
+                     -11.7866497*$phi**3 +
+                      22.6807411*$phi**3.5 +
+                     -15.9618719*$phi**4 +
+                      1.80122502*$phi**7.5)
+                      ) * 22.064e6;
+      my $humidity_abs  = $Pw / (461.5 * $temperatureK) * 1000.0;
+
+      # Calculate dewpoint
+      my $param = 17.625 * $temperature  / (243.04 + $temperature);
+      my $ln = log($humidity_rel / 100.0);
+      my $dewpoint = 243.04 * ($ln + $param) / (17.625 - $ln - $param);
+
+      print "$device $family "
+                       . sprintf("%.1f", $temperature) . " °C "
+                       . sprintf("%.1f", $humidity_rel) . " %RH "
+                       . sprintf("%.1f", $dewpoint) . " °C "
+                       . sprintf("%.1f", $humidity_abs) . " g/m³\n";
+
+   } # if ($family == 26)
+}
+
+OW::finish();

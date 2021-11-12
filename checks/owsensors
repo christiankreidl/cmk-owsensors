@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+
+# License: GNU General Public License v2
+# (c) 2021 Christian Kreidl
+
+
+#<<<owsensors>>>
+# name sensor_type temperature unit [ relhumid unit dewpoint unit abshumid unit]
+#AC-unit-intake 28 23.6 °C
+#Room-Rack1-445 26 23.6 °C 26 %RH 2.9 °C 5.5 g/m³
+#Room-Rack1-542 26 23.3 °C 27 %RH 3.0 °C 5.6 g/m³
+
+from cmk.base.check_api import check_levels
+from cmk.base.check_legacy_includes.temperature import check_temperature
+from cmk.base.check_legacy_includes.humidity import check_humidity
+
+
+factory_settings["owsensors_temp_default_levels"] = {
+        "levels"      : (30, 35),
+        "levels_lower": (20, 15),
+}
+
+factory_settings["owsensors_humid_default_levels"] = {
+        "levels"      : (60, 65),
+        "levels_lower": (15, 20),
+}
+
+def parse_owsensors(info):
+   result = {}
+
+   for line in info:
+      sname = line[0]
+      sensor_type = line[1]
+      
+      # DS18B20 Tempsensor
+      if sensor_type == "28":
+         result.setdefault("temp", {})[sname] = float(line[2])
+
+      # DS2438 battery monitor aka Multisensor
+      if sensor_type == "26":
+         result.setdefault("temp", {})[sname]      = float(line[2])
+         result.setdefault("humid", {})[sname]     = float(line[4])
+         result.setdefault("dew", {})[sname]       = float(line[6])
+         result.setdefault("humidabs", {})[sname]  = float(line[8])
+   return result
+
+
+def inventory_owsensors(sensor_type, parsed):
+    for key in parsed.get(sensor_type, {}).keys():
+        yield key, {}
+
+
+def check_owsensors_temperature(item, params, parsed):
+    if item in parsed.get('temp', {}):
+        yield check_temperature(parsed['temp'][item], params, "owsensors_temp_%s" % item)
+
+def check_owsensors_humidity(item, params, parsed):
+    if item in parsed.get('humid', {}):
+         status, infotext, perfdata = check_humidity(parsed['humid'][item], params)
+         perfdata.append( ("dewpoint", parsed['dew'][item]) )
+         perfdata.append( ("humidity_abs", parsed['humidabs'][item]) )
+         perfdata.append( ("temperature", parsed['temp'][item]) )
+         yield status, infotext, perfdata
+
+
+# declare the check to Check_MK
+check_info["owsensors"] = {
+    'parse_function'          : parse_owsensors,
+}
+
+check_info["owsensors.temp"] = {
+    'check_function'          : check_owsensors_temperature,
+    'inventory_function'      : lambda parsed: inventory_owsensors('temp', parsed),
+    'service_description'     : "Temperature %s",
+    'default_levels_variable' : "owsensors_temp_default_levels",
+    'group'                   : "temperature",
+    'has_perfdata'            : True,
+}
+
+check_info["owsensors.humid"] = {
+    'check_function'          : check_owsensors_humidity,
+    'inventory_function'      : lambda parsed: inventory_owsensors('humid', parsed),
+    'service_description'     : "Humidity %s",
+    'default_levels_variable' : "owsensors_humid_default_levels",
+    'group'                   : "humidity",
+    'has_perfdata'            : True,
+}
