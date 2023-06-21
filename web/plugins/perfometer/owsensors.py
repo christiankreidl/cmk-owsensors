@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from cmk.gui.plugins.views.perfometers.check_mk import (
-    perfometer_fanspeed,
-    perfometer_temperature_multi,
-    perfometer_voltage,
-    perfometer_humidity,
-)
+from cmk.gui.plugins.metrics import perfometer_info
 
-perfometers['check_mk-owsensors.humid'] = perfometer_humidity
+perfometer_info.append({
+    "type": "linear",
+    "metric": ["humidity"],
+    "total": 100.0,
+})

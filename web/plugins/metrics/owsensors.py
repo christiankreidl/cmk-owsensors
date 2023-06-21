@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+from cmk.gui.i18n import _
+from cmk.gui.plugins.metrics import (
+    metric_info,
+    graph_info,
+)
 
 unit_info["g/m3"] = {
     "title"     : _(u"g/m³"),
