@@ -44,7 +44,7 @@ from .agent_based_api.v1 import (
 )
 #import datetime
 
-from .utils.humidity import check_humidity, CheckParams
+from .utils.humidity import check_humidity
 from .utils.temperature import check_temperature, TempParamDict
 
 Sensor  = Dict[str, float]
@@ -92,7 +92,7 @@ def check_owsensors_temperature(
 
 
 def check_owsensors_humidity(
-    item: str, params: CheckParams, section: Section
+    item: str, params: Mapping[str, Any], section: Section
 ) -> type_defs.CheckResult:
     if item in section.get('humid', {}):
          yield Metric("dewpoint", section['dew'][item])
