@@ -1,0 +1,16 @@
+{'author': 'Christian Kreidl',
+ 'description': 'Monitor 1-wire sensors with owsensors',
+ 'download_url': 'https://github.com/christiankreidl/cmk-owsensors',
+ 'files': {'bin': ['owsensors'],
+           'cmk_addons_plugins': ['owsensors/agent_based/owsensors.py',
+                                  'owsensors/bin/owsensors',
+                                  'owsensors/checkman/owsensors',
+                                  'owsensors/graphing/owsensors.py'],
+	  },
+ 'name': 'owsensors',
+ 'title': 'OWSensors',
+ 'version': '0.3.0',
+ 'version.min_required': '2.3.0b1',
+ 'version.packaged': 'cmk-mkp-tool 1.0.0',
+ 'version.usable_until': None
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- encoding: utf-8; py-indent-offset: 4 -*-
 
-# (c) 2021 Christian Kreidl
+# (c) 2021-2025 Christian Kreidl
 
 # This is free software;  you can redistribute it and/or modify it
 # under the  terms of the  GNU General Public License  as published by
@@ -30,27 +30,29 @@ from typing import (
     TypedDict,
     Tuple,
 )
-from .agent_based_api.v1 import (
-    get_value_store,
-#    check_levels,
-    register,
-#    render,
-    type_defs,
-    Metric,
-#    Result,
-    Service,
-#    ServiceLabel,
-#    State,
-)
-#import datetime
 
-from .utils.humidity import check_humidity
-from .utils.temperature import check_temperature, TempParamDict
+from cmk.agent_based.v2 import (
+  get_value_store,
+  AgentSection,
+  CheckPlugin,
+  Service,
+#  Result,
+#  State,
+  Metric,
+#  check_levels,
+  StringTable,
+  DiscoveryResult,
+  CheckResult
+ )
+
+from cmk.plugins.lib.humidity import check_humidity, CheckParams
+from cmk.plugins.lib.temperature import check_temperature, TempParamDict
+
 
 Sensor  = Dict[str, float]
 Section = Dict[str, Sensor]
 
-def parse_owsensors(string_table: type_defs.StringTable) -> Section:
+def parse_owsensors(string_table: StringTable) -> Section:
    result: Section = {}
 
    for line in string_table:
@@ -70,44 +72,40 @@ def parse_owsensors(string_table: type_defs.StringTable) -> Section:
    return result
 
 
-def discover_owsensors_sensors_temp(section) -> type_defs.DiscoveryResult:
+def discover_owsensors_sensors_temp(section: Section) -> DiscoveryResult:
     for sensorname in section.get('temp', {}).keys():
         yield Service(item=sensorname)
 
-def discover_owsensors_sensors_humid(section) -> type_defs.DiscoveryResult:
+def discover_owsensors_sensors_humid(section: Section) -> DiscoveryResult:
     for sensorname in section.get('humid', {}).keys():
         yield Service(item=sensorname)
 
 
-def check_owsensors_temperature(
-    item: str, params: TempParamDict, section: Section
-) -> type_defs.CheckResult:
+def check_owsensors_temperature(item: str, params: TempParamDict, section: Section) -> CheckResult:
     if item in section.get('temp', {}):
         yield from check_temperature(
-            section['temp'][item],
-            params,
+            reading=section['temp'][item],
+            params=params,
             unique_name="owsensors_temp_%s" % item,
             value_store=get_value_store(),
         )
 
 
-def check_owsensors_humidity(
-    item: str, params: Mapping[str, Any], section: Section
-) -> type_defs.CheckResult:
+def check_owsensors_humidity(item: str, params: Mapping[str, Any], section: Section) -> CheckResult:
     if item in section.get('humid', {}):
          yield Metric("dewpoint", section['dew'][item])
          yield Metric("humidity_abs", section['humidabs'][item])
-         yield Metric("temperature", section['temp'][item])
+         yield Metric("temp", section['temp'][item])
          yield from check_humidity(section['humid'][item], params)
 
 
 
-register.agent_section(
+agent_section_owsensors = AgentSection(
     name="owsensors",
     parse_function=parse_owsensors,
 )
 
-register.check_plugin(
+check_plugin_owsensors_temperature = CheckPlugin(
     name="owsensors_temp",
     sections=["owsensors"],
     service_name="Temperature %s",
@@ -117,7 +115,7 @@ register.check_plugin(
     check_default_parameters={},
 )
 
-register.check_plugin(
+check_plugin_owsensors_humidity = CheckPlugin(
     name="owsensors_humid",
     sections=["owsensors"],
     service_name="Humidity %s",
@@ -126,3 +124,4 @@ register.check_plugin(
     check_ruleset_name="humidity",
     check_default_parameters={},
 )
+
